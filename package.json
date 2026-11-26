@@ -1,21 +1,25 @@
 {
-  "name": "enas-beauty-next",
+  "name": "enas-beauty-salon",
   "private": true,
+  "version": "2.0.0",
+  "description": "Bilingual Next.js website for Ena’s Beauty Salon, Katy, Texas",
   "scripts": {
-    "dev": "next dev --port 4175",
+    "dev": "next dev --port 4176",
     "build": "next build",
-    "start": "next start --port 4175",
-    "check": "tsc --noEmit"
+    "start": "next start --port 4176",
+    "check": "tsc --noEmit",
+    "assets": "python scripts/make-brand-assets.py"
   },
   "dependencies": {
     "next": "16.4.6",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
-    "@types/react-dom": "19.3.0"
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
   }
 }

@@ -70,6 +70,7 @@ export default async function Home({params}: {params: Promise<{lang: string}>}) 
               <a className="text-link" href={site.social.tiktok} target="_blank" rel="noopener noreferrer">TikTok</a>
             </div>
           </div>
+          <div className="reels-viewport">
           <div className="reels">
             {reels.map((reel, index) => (
               <a className="reel" key={reel.id} data-video={`/videos/${reel.id}.mp4`} href={`https://www.instagram.com/enaramires62/reel/${reel.id}/`} target="_blank" rel="noopener noreferrer">
@@ -77,6 +78,7 @@ export default async function Home({params}: {params: Promise<{lang: string}>}) 
                 <span className="reel-label"><span>{d.portfolio.reel(index + 1)}</span><span aria-hidden="true">▶</span></span>
               </a>
             ))}
+          </div>
           </div>
           <ReelControls lang={lang} count={reels.length} />
         </section>

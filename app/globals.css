@@ -323,3 +323,14 @@ html[lang=es] .google-attribution:before{content:'Reseñas de '}
 .rate-status{font-size:.85rem;color:var(--wine);margin:6px 0 0}
 @media(min-width:900px){.rate{grid-template-columns:1fr 1.15fr;align-items:center;gap:70px}}
 @media(prefers-reduced-motion:reduce){.rate-stars label{transition:none}.rate-stars label:hover{transform:none}}
+
+/* Phone reel carousel: transform-based, no inner scroll container.
+   Vertical swipes over the videos always scroll the page (touch-action: pan-y). */
+.reels-viewport{position:relative}
+@media(max-width:660px){
+  .reels-viewport{overflow:hidden;margin-inline:-4px;padding:4px;touch-action:pan-y}
+  .reels{overflow:visible!important;scroll-snap-type:none!important;overscroll-behavior:auto!important;padding:0 0 4px!important;touch-action:pan-y;transform:translateX(calc(var(--reel-shift,0px) + var(--reel-drag,0px)));transition:transform .45s cubic-bezier(.2,.7,.2,1);will-change:transform}
+  .reels[style*="--reel-drag"]{transition:none}
+  .reel img{-webkit-user-drag:none;user-select:none}
+}
+@media(prefers-reduced-motion:reduce){.reels{transition:none!important}}

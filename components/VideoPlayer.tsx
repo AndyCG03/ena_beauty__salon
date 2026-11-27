@@ -63,42 +63,109 @@ export function VideoPlayer({lang}: {lang: Lang}) {
   );
 }
 
-/** Prev/next controls for the swipeable reel strip on phones. */
+/**
+ * Phone carousel for the reels. The strip moves with a CSS transform instead of a scroll
+ * container, and only listens to clear horizontal swipes (`touch-action: pan-y`): vertical
+ * gestures over the videos always scroll the page. A swipe never opens a video by accident.
+ * On wider screens the reels are a static grid and these controls are hidden by CSS.
+ */
 export function ReelControls({lang, count}: {lang: Lang; count: number}) {
   const t = dictionaries[lang].portfolio;
-  const [position, setPosition] = useState({index: 0, start: true, end: false});
+  const [index, setIndex] = useState(0);
+  const [maxIndex, setMaxIndex] = useState(count - 1);
+  const indexRef = useRef(0);
+  const maxRef = useRef(count - 1);
+  indexRef.current = index;
+  maxRef.current = maxIndex;
 
+  // Position the strip for the current index.
   useEffect(() => {
-    const strip = document.querySelector<HTMLElement>('.reels');
-    if (!strip) return;
-    const update = () => {
+    const viewport = document.querySelector<HTMLElement>('.reels-viewport');
+    const strip = viewport?.querySelector<HTMLElement>('.reels');
+    if (!viewport || !strip) return;
+    const place = () => {
+      const phone = window.matchMedia('(max-width: 660px)').matches;
       const cards = [...strip.children] as HTMLElement[];
-      const origin = cards[0]?.offsetLeft ?? 0;
-      const index = cards.reduce((best, card, i) =>
-        Math.abs(card.offsetLeft - origin - strip.scrollLeft) < Math.abs(cards[best].offsetLeft - origin - strip.scrollLeft) ? i : best, 0);
-      setPosition({index, start: strip.scrollLeft <= 1, end: strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1});
+      if (!phone || !cards.length) {
+        strip.style.removeProperty('--reel-shift');
+        return;
+      }
+      const limit = Math.max(0, strip.scrollWidth - viewport.clientWidth);
+      // Last index at which a further move still changes what is visible.
+      const last = cards.findIndex(card => card.offsetLeft - cards[0].offsetLeft >= limit);
+      setMaxIndex(last === -1 ? cards.length - 1 : last);
+      const shift = Math.min(limit, cards[Math.min(index, cards.length - 1)].offsetLeft - cards[0].offsetLeft);
+      strip.style.setProperty('--reel-shift', `${-shift}px`);
     };
-    strip.addEventListener('scroll', update, {passive: true});
-    window.addEventListener('resize', update);
-    update();
-    return () => {
-      strip.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [index]);
 
-  const move = (direction: number) => {
-    const strip = document.querySelector<HTMLElement>('.reels');
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    strip?.scrollBy({left: direction * strip.clientWidth * 0.75, behavior: reduce ? 'instant' : 'smooth'});
-  };
+  // Swipe handling and keyboard focus.
+  useEffect(() => {
+    const viewport = document.querySelector<HTMLElement>('.reels-viewport');
+    const strip = viewport?.querySelector<HTMLElement>('.reels');
+    if (!viewport || !strip) return;
+    let startX = 0, startY = 0, tracking = false, swiped = false;
+    const down = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      tracking = true; swiped = false; startX = event.clientX; startY = event.clientY;
+    };
+    const move = (event: PointerEvent) => {
+      if (!tracking) return;
+      const dx = event.clientX - startX;
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(event.clientY - startY)) strip.style.setProperty('--reel-drag', `${dx * 0.6}px`);
+    };
+    const up = (event: PointerEvent) => {
+      if (!tracking) return;
+      tracking = false;
+      strip.style.removeProperty('--reel-drag');
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        swiped = true;
+        setIndex(i => Math.max(0, Math.min(maxRef.current, i + (dx < 0 ? 1 : -1))));
+      }
+    };
+    const cancel = () => { tracking = false; strip.style.removeProperty('--reel-drag'); };
+    // Capture phase: a swipe must not open the video player or follow the link.
+    const click = (event: MouseEvent) => {
+      if (!swiped) return;
+      event.preventDefault();
+      event.stopPropagation();
+      swiped = false;
+    };
+    const focus = (event: FocusEvent) => {
+      const card = (event.target as HTMLElement).closest('.reel');
+      const i = card ? [...strip.children].indexOf(card) : -1;
+      if (i >= 0 && i !== indexRef.current) setIndex(i);
+    };
+    viewport.addEventListener('pointerdown', down);
+    viewport.addEventListener('pointermove', move);
+    viewport.addEventListener('pointerup', up);
+    viewport.addEventListener('pointercancel', cancel);
+    viewport.addEventListener('click', click, true);
+    strip.addEventListener('focusin', focus);
+    return () => {
+      viewport.removeEventListener('pointerdown', down);
+      viewport.removeEventListener('pointermove', move);
+      viewport.removeEventListener('pointerup', up);
+      viewport.removeEventListener('pointercancel', cancel);
+      viewport.removeEventListener('click', click, true);
+      strip.removeEventListener('focusin', focus);
+    };
+  }, [count]);
+
+  const go = (delta: number) => setIndex(i => Math.max(0, Math.min(maxIndex, i + delta)));
+  const shown = Math.min(index, maxIndex);
 
   return (
     <div className="portfolio-controls">
-      <p className="reel-position" aria-live="polite">{String(position.index + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}</p>
+      <p className="reel-position" aria-live="polite">{String(shown >= maxIndex ? count : shown + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}</p>
       <div>
-        <button type="button" aria-label={t.prev} disabled={position.start} onClick={() => move(-1)}>‹</button>
-        <button type="button" aria-label={t.next} disabled={position.end} onClick={() => move(1)}>›</button>
+        <button type="button" aria-label={t.prev} disabled={shown <= 0} onClick={() => go(-1)}>‹</button>
+        <button type="button" aria-label={t.next} disabled={shown >= maxIndex} onClick={() => go(1)}>›</button>
       </div>
     </div>
   );
